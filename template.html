@@ -1,0 +1,290 @@
+<title>{{PROJECT}} の決めごと</title>
+<style>
+/* 問いを1列に積む、静かな紙の読みもの。墨とグレーに、アクセントは1色（--c） */
+:root {
+  --ground: #f7f4ee;
+  --paper: #fffdf9;
+  --ink: #262420;
+  --sub: #77736b;
+  --rule: #e3ded4;
+  --c: #4e6178;
+  --font-jp: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', system-ui, sans-serif;
+  --font-latin: 'Avenir Next', 'Helvetica Neue', 'Hiragino Sans', sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --ground: #18191c; --paper: #202226; --ink: #e8e5df; --sub: #9a968e; --rule: #2f3136; --c: #9fb3cc; color-scheme: dark; }
+}
+:root[data-theme="dark"] { --ground: #18191c; --paper: #202226; --ink: #e8e5df; --sub: #9a968e; --rule: #2f3136; --c: #9fb3cc; color-scheme: dark; }
+
+body { background: var(--ground); color: var(--ink); font-family: var(--font-jp); font-size: 15px; line-height: 1.7; }
+.wrap { max-width: 760px; margin: 0 auto; padding-inline: 20px; padding-block: 28px 80px; }
+.logo { font-family: var(--font-latin); font-weight: 600; font-size: 12px; letter-spacing: .32em; color: var(--sub); text-align: center; }
+h1 { font-size: 22px; font-weight: 600; margin: 18px 0 4px; text-wrap: balance; }
+.lead { color: var(--sub); font-size: 13px; margin: 0; }
+
+.tabs { display: flex; gap: 20px; margin: 26px 0 0; border-bottom: 1px solid var(--rule); }
+.tabs button { appearance: none; background: none; border: 0; padding: 10px 0; font: inherit; font-size: 14px; color: var(--sub); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--c); }
+.tabs .n { font-family: var(--font-latin); font-variant-numeric: tabular-nums; margin-left: 4px; }
+.tabs button:focus-visible, .opt:focus-within, .btn:focus-visible { outline: 2px solid var(--c); outline-offset: 2px; }
+
+.q { padding-block: 30px; border-bottom: 1px solid var(--rule); display: grid; gap: 14px; }
+.eyebrow { display: flex; gap: 10px; align-items: baseline; font-family: var(--font-latin); font-size: 11px; font-weight: 600; letter-spacing: .18em; color: var(--sub); text-transform: uppercase; }
+.eyebrow a { color: var(--c); text-decoration: none; letter-spacing: .06em; }
+.q h2 { font-size: 18px; font-weight: 600; margin: 0; line-height: 1.5; text-wrap: balance; }
+.q p { margin: 0; }
+.muted { color: var(--sub); font-size: 13px; }
+
+.strip { display: grid; gap: 6px; }
+.strip .cap { font-size: 12px; color: var(--sub); }
+.strip .scroller { overflow-x: auto; border: 1px solid var(--rule); background: var(--paper); }
+.strip img { display: block; height: 300px; width: auto; max-width: none; cursor: zoom-in; }
+@media (max-width: 520px) { .strip img { height: 220px; } }
+
+.opts { display: grid; gap: 8px; }
+.opt { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; align-items: start; padding: 12px 14px; border: 1px solid var(--rule); background: var(--paper); cursor: pointer; }
+.opt input { margin: 4px 0 0; accent-color: var(--c); grid-row: span 2; }
+.opt b { font-weight: 600; }
+.opt span { color: var(--sub); font-size: 13px; grid-column: 2; }
+.opt:has(input:checked) { border-color: var(--c); }
+textarea { width: 100%; box-sizing: border-box; min-height: 64px; padding: 10px 12px; font: inherit; font-size: 14px; color: var(--ink); background: var(--paper); border: 1px solid var(--rule); resize: vertical; }
+.row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.btn { appearance: none; font: inherit; font-size: 14px; font-weight: 600; padding: 9px 20px; border: 1px solid var(--ink); background: var(--ink); color: var(--ground); cursor: pointer; }
+.btn.ghost { background: none; color: var(--ink); border-color: var(--rule); font-weight: 400; }
+.btn:disabled { opacity: .4; cursor: default; }
+.answer { border-left: 2px solid var(--c); padding: 2px 0 2px 12px; }
+.answer .when { font-family: var(--font-latin); font-variant-numeric: tabular-nums; color: var(--sub); font-size: 12px; margin-left: 8px; }
+.decided { border-left: 2px solid var(--rule); padding: 2px 0 2px 12px; }
+.decided li { margin: 2px 0; }
+.decided ul { margin: 0; padding-left: 1.2em; }
+.copybar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; padding-block: 16px; border-bottom: 1px solid var(--rule); }
+.copybar .muted { flex: 1 1 200px; min-width: 0; }
+#copy-text { width: 100%; min-height: 120px; font-size: 13px; }
+.empty { padding-block: 40px; color: var(--sub); text-align: center; font-size: 14px; }
+.note-off { color: var(--sub); font-size: 12px; }
+
+.zoom { position: fixed; inset: 0; background: color-mix(in srgb, var(--ground) 94%, transparent); overflow: auto; z-index: 10; padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px); }
+.zoom img { display: block; max-width: none; height: min(86vh, 900px); width: auto; margin: 4vh 16px; cursor: zoom-out; }
+.zoom button { position: fixed; top: calc(env(safe-area-inset-top, 0px) + 12px); right: 16px; }
+@media (prefers-reduced-motion: no-preference) { .q { animation: in .3s ease-out both; } @keyframes in { from { opacity: .4; } to { opacity: 1; } } }
+</style>
+
+<div class="wrap">
+  <div class="logo">{{PROJECT}}</div>
+  <h1>決めごと</h1>
+  <p class="lead">作業の途中で聞きたいことと見本をここに置きます。答えたら「答えをコピー」を押して、チャットに貼ってください。</p>
+
+  <div class="tabs" role="tablist" aria-label="絞り込み">
+    <button role="tab" id="tab-open" aria-selected="true" data-tab="open">まだ<span class="n" id="n-open"></span></button>
+    <button role="tab" id="tab-answered" aria-selected="false" data-tab="answered">答えた<span class="n" id="n-answered"></span></button>
+    <button role="tab" id="tab-decided" aria-selected="false" data-tab="decided">決まった<span class="n" id="n-decided"></span></button>
+  </div>
+  <div class="copybar" id="copybar" hidden>
+    <span class="muted" id="copy-label"></span>
+    <button class="btn" id="copy-btn">答えをコピー</button>
+    <textarea id="copy-text" hidden readonly aria-label="チャットに貼る答え"></textarea>
+  </div>
+  <p class="note-off" id="db-off" hidden>このページでは答えを保存できません。チャットで答えてください。</p>
+  <div id="list"></div>
+</div>
+<div class="zoom" id="zoom" hidden><button class="btn ghost" id="zoom-close">閉じる</button><img id="zoom-img" alt=""></div>
+
+<script>
+// 問い（ここは Claude が書き足す）。答えは db の answers/<id> に入る
+const QUESTIONS = [
+  // 例: {
+  //   id: 'q-emoji',                      // 問いの id（db の answers/<id>）。聞き直すときは新しい id にする
+  //   tag: '#143', link: 'https://…',     // 小さな見出し（issue 番号など）と、そのリンク（なくてよい）
+  //   topic: '画像にする',
+  //   title: '絵文字をどこに置く？',        // 問いは1行
+  //   context: '',                        // 要るときだけ短い1行
+  //   images: [{ src: 'img/emoji-a.jpg', cap: '案1' }],
+  //   options: [{ key: 'a', label: '案1 紙のふち', desc: '' }, { key: 'b', label: '案2 名前の横', desc: '' }],
+  // },
+]
+
+// 決まったこと（見返す用）
+const DECIDED = [
+  // 例: { id: 'd-emoji', tag: '#143', link: '', topic: '画像にする', date: '2026-10-17', title: '絵文字は名前の横', points: ['台紙なし'], images: [] },
+]
+
+const answers = {}
+let tab = 'open'
+let db = null
+let dbReady = false
+const drafts = {}
+
+const el = (tag, attrs = {}, ...kids) => {
+  const e = document.createElement(tag)
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === 'class') e.className = v
+    else if (k.startsWith('on')) e.addEventListener(k.slice(2), v)
+    else if (v !== undefined && v !== false) e.setAttribute(k, v === true ? '' : v)
+  }
+  for (const kid of kids.flat()) if (kid !== null && kid !== undefined && kid !== false) e.append(kid)
+  return e
+}
+
+function eyebrow(tag, link, topic) {
+  const head = tag && (link ? el('a', { href: link, target: '_blank', rel: 'noopener' }, tag) : el('span', {}, tag))
+  return el('div', { class: 'eyebrow' }, head, topic)
+}
+
+function strips(images = []) {
+  return images.map((im) => el('div', { class: 'strip' },
+    el('div', { class: 'cap' }, im.cap),
+    el('div', { class: 'scroller' }, el('img', { src: im.src, alt: im.cap, loading: 'lazy', onclick: () => openZoom(im) })),
+  ))
+}
+
+function fmt(at) {
+  const d = new Date(at)
+  if (isNaN(d)) return ''
+  return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
+function questionView(q) {
+  const a = answers[q.id]
+  const editing = drafts[q.id]?.editing || !a
+  const draft = drafts[q.id] ?? (drafts[q.id] = { choice: a?.choice ?? '', note: a?.note ?? '', editing: false })
+  const box = el('section', { class: 'q', id: q.id },
+    eyebrow(q.tag, q.link, q.topic),
+    el('h2', {}, q.title),
+    q.context && el('p', { class: 'muted' }, q.context),
+    strips(q.images),
+  )
+  if (!editing) {
+    const opt = q.options.find((o) => o.key === a.choice)
+    box.append(el('div', { class: 'answer' },
+      el('div', {}, el('b', {}, opt ? opt.label : a.choice), el('span', { class: 'when' }, fmt(a.at))),
+      a.note && el('div', { class: 'muted' }, a.note),
+    ))
+    box.append(el('div', { class: 'row' }, el('button', { class: 'btn ghost', disabled: !dbReady, onclick: () => { draft.editing = true; render() } }, '答えを変える')))
+    return box
+  }
+  box.append(el('div', { class: 'opts', role: 'radiogroup', 'aria-label': q.title },
+    q.options.map((o) => el('label', { class: 'opt' },
+      el('input', { type: 'radio', name: q.id, id: `${q.id}-${o.key}`, value: o.key, checked: draft.choice === o.key, onchange: () => { draft.choice = o.key; render() } }),
+      el('b', {}, o.label),
+      o.desc && el('span', {}, o.desc),
+    )),
+  ))
+  const ta = el('textarea', { id: `${q.id}-note`, placeholder: 'ひとこと（任意）', 'aria-label': 'ひとこと' })
+  ta.value = draft.note
+  ta.addEventListener('input', () => { draft.note = ta.value })
+  box.append(ta)
+  const status = el('span', { class: 'muted', id: `${q.id}-status` })
+  box.append(el('div', { class: 'row' },
+    el('button', { class: 'btn', disabled: !dbReady || !draft.choice, onclick: () => save(q, status) }, '答える'),
+    a && el('button', { class: 'btn ghost', onclick: () => { draft.editing = false; draft.choice = a.choice; draft.note = a.note ?? ''; render() } }, 'やめる'),
+    status,
+  ))
+  return box
+}
+
+function decidedView(d) {
+  return el('section', { class: 'q', id: d.id },
+    eyebrow(d.tag, d.link, d.topic),
+    el('h2', {}, d.title),
+    el('div', { class: 'decided' }, el('ul', {}, d.points.map((p) => el('li', {}, p)))),
+    el('div', { class: 'muted' }, `${d.date.replaceAll('-', '.')} に決めた`),
+    strips(d.images),
+  )
+}
+
+async function save(q, status) {
+  const draft = drafts[q.id]
+  status.textContent = '保存中…'
+  try {
+    await db.collection('answers').doc(q.id).set({ choice: draft.choice, note: draft.note.trim(), at: new Date().toISOString(), question: q.title })
+    draft.editing = false
+    status.textContent = ''
+  } catch (e) {
+    status.textContent = e?.code === 'invalid_argument' ? 'このアカウントでは保存できません' : '保存できませんでした。もう一度押してください'
+  }
+}
+
+// チャットに貼る文。まだ「決まった」に移していない問いの答えだけ
+function answerText() {
+  const lines = QUESTIONS.filter((q) => answers[q.id]).map((q) => {
+    const a = answers[q.id]
+    const opt = q.options.find((o) => o.key === a.choice)
+    return `- ${q.tag ? q.tag + ' ' : ''}${q.title} → ${opt ? opt.label : a.choice}${a.note ? `（${a.note}）` : ''}`
+  })
+  return lines.length ? ['決めごとページの答え', ...lines].join('\n') : ''
+}
+
+function renderCopy() {
+  const n = QUESTIONS.filter((q) => answers[q.id]).length
+  document.getElementById('copybar').hidden = n === 0
+  document.getElementById('copy-label').textContent = `答えた ${n} 問を、チャットに貼れる形でコピーします`
+}
+
+document.getElementById('copy-btn').addEventListener('click', async () => {
+  const text = answerText()
+  const btn = document.getElementById('copy-btn')
+  const box = document.getElementById('copy-text')
+  try {
+    await navigator.clipboard.writeText(text)
+    box.hidden = true
+    btn.textContent = 'コピーしました'
+    setTimeout(() => (btn.textContent = '答えをコピー'), 2000)
+  } catch {
+    // コピーできない画面では、選んだ状態の文を出す
+    box.value = text
+    box.hidden = false
+    box.focus()
+    box.select()
+    btn.textContent = '下の文をコピーしてください'
+  }
+})
+
+function render() {
+  renderCopy()
+  const open = QUESTIONS.filter((q) => !answers[q.id] || drafts[q.id]?.editing)
+  const answered = QUESTIONS.filter((q) => answers[q.id] && !drafts[q.id]?.editing)
+  document.getElementById('n-open').textContent = open.length
+  document.getElementById('n-answered').textContent = answered.length
+  document.getElementById('n-decided').textContent = DECIDED.length
+  for (const b of document.querySelectorAll('.tabs button')) b.setAttribute('aria-selected', String(b.dataset.tab === tab))
+  const list = document.getElementById('list')
+  const active = document.activeElement?.id
+  list.replaceChildren()
+  const items = tab === 'open' ? open.map(questionView) : tab === 'answered' ? answered.map(questionView) : DECIDED.map(decidedView)
+  if (!items.length) list.append(el('p', { class: 'empty' }, tab === 'open' ? 'いま聞きたいことはありません' : tab === 'answered' ? 'まだ答えはありません' : 'まだありません'))
+  list.append(...items)
+  if (active) document.getElementById(active)?.focus()
+}
+
+function openZoom(im) {
+  const z = document.getElementById('zoom')
+  const img = document.getElementById('zoom-img')
+  img.src = im.src
+  img.alt = im.cap
+  z.hidden = false
+}
+document.getElementById('zoom').addEventListener('click', () => { document.getElementById('zoom').hidden = true })
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') document.getElementById('zoom').hidden = true })
+for (const b of document.querySelectorAll('.tabs button')) b.addEventListener('click', () => { tab = b.dataset.tab; render() })
+
+render()
+
+;(async () => {
+  db = await window.claude?.use?.('db').catch(() => null) ?? null
+  if (!db) {
+    document.getElementById('db-off').hidden = false
+    return
+  }
+  dbReady = true
+  render()
+  db.collection('answers').onSnapshot((snap) => {
+    for (const k of Object.keys(answers)) delete answers[k]
+    for (const d of snap.docs) if (d.exists) answers[d.id] = d.data()
+    render()
+  }, () => {
+    dbReady = false
+    document.getElementById('db-off').hidden = false
+    render()
+  })
+})()
+</script>
