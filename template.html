@@ -108,6 +108,9 @@ const DECIDED = [
   // 例: { id: 'd-emoji', tag: '#143', link: '', topic: '画像にする', date: '2026-10-17', title: '絵文字は名前の横', points: ['台紙なし'], images: [] },
 ]
 
+// どの選択肢にも当てはまらないときの答え。どの問いにも最後に足す（問いの側で key: 'other' を書いていればそれを使う）
+const OTHER = { key: 'other', label: 'どれでもない', desc: 'ひとことに書く' }
+const optionsOf = (q) => (q.options.some((o) => o.key === OTHER.key) ? q.options : [...q.options, OTHER])
 const answers = {}
 let tab = 'open'
 let db = null
@@ -154,7 +157,7 @@ function questionView(q) {
     strips(q.images),
   )
   if (!editing) {
-    const opt = q.options.find((o) => o.key === a.choice)
+    const opt = optionsOf(q).find((o) => o.key === a.choice)
     box.append(el('div', { class: 'answer' },
       el('div', {}, el('b', {}, opt ? opt.label : a.choice), el('span', { class: 'when' }, fmt(a.at))),
       a.note && el('div', { class: 'muted' }, a.note),
@@ -163,13 +166,13 @@ function questionView(q) {
     return box
   }
   box.append(el('div', { class: 'opts', role: 'radiogroup', 'aria-label': q.title },
-    q.options.map((o) => el('label', { class: 'opt' },
+    optionsOf(q).map((o) => el('label', { class: 'opt' },
       el('input', { type: 'radio', name: q.id, id: `${q.id}-${o.key}`, value: o.key, checked: draft.choice === o.key, onchange: () => { draft.choice = o.key; render() } }),
       el('b', {}, o.label),
       o.desc && el('span', {}, o.desc),
     )),
   ))
-  const ta = el('textarea', { id: `${q.id}-note`, placeholder: 'ひとこと（任意）', 'aria-label': 'ひとこと' })
+  const ta = el('textarea', { id: `${q.id}-note`, placeholder: draft.choice === OTHER.key ? 'どうしたいかを書く' : 'ひとこと（任意）', 'aria-label': 'ひとこと' })
   ta.value = draft.note
   ta.addEventListener('input', () => { draft.note = ta.value })
   box.append(ta)
@@ -194,6 +197,10 @@ function decidedView(d) {
 
 async function save(q, status) {
   const draft = drafts[q.id]
+  if (draft.choice === OTHER.key && !draft.note.trim()) {
+    status.textContent = 'どうしたいかを、ひとことに書いてください'
+    return
+  }
   status.textContent = '保存中…'
   try {
     await db.collection('answers').doc(q.id).set({ choice: draft.choice, note: draft.note.trim(), at: new Date().toISOString(), question: q.title })
@@ -208,7 +215,7 @@ async function save(q, status) {
 function answerText() {
   const lines = QUESTIONS.filter((q) => answers[q.id]).map((q) => {
     const a = answers[q.id]
-    const opt = q.options.find((o) => o.key === a.choice)
+    const opt = optionsOf(q).find((o) => o.key === a.choice)
     return `- ${q.tag ? q.tag + ' ' : ''}${q.title} → ${opt ? opt.label : a.choice}${a.note ? `（${a.note}）` : ''}`
   })
   return lines.length ? ['決めごとページの答え', ...lines].join('\n') : ''
