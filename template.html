@@ -41,6 +41,15 @@ h1 { font-size: 22px; font-weight: 600; margin: 18px 0 4px; text-wrap: balance; 
 .strip img { display: block; height: 300px; width: auto; max-width: none; cursor: zoom-in; }
 @media (max-width: 520px) { .strip img { height: 220px; } }
 
+.sheet { display: grid; grid-template-columns: fit-content(7em) repeat(var(--cols), minmax(0, 1fr)); gap: 8px; align-items: start; }
+.sheet .h, .sheet .rl { font-size: 12px; color: var(--sub); line-height: 1.4; overflow-wrap: anywhere; }
+.sheet .h { align-self: end; }
+.sheet .rl { align-self: center; }
+.sheet .cell { appearance: none; display: block; width: 100%; min-width: 0; padding: 0; border: 1px solid var(--rule); background: var(--paper); cursor: zoom-in; }
+.sheet .cell img { display: block; width: 100%; height: auto; }
+.sheet .cell:focus-visible { outline: 2px solid var(--c); outline-offset: 2px; }
+.sheet .blank { min-height: 1px; }
+
 .opts { display: grid; gap: 8px; }
 .opt { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; align-items: start; padding: 12px 14px; border: 1px solid var(--rule); background: var(--paper); cursor: pointer; }
 .opt input { margin: 4px 0 0; accent-color: var(--c); grid-row: span 2; }
@@ -63,9 +72,18 @@ textarea { width: 100%; box-sizing: border-box; min-height: 64px; padding: 10px 
 .empty { padding-block: 40px; color: var(--sub); text-align: center; font-size: 14px; }
 .note-off { color: var(--sub); font-size: 12px; }
 
-.zoom { position: fixed; inset: 0; background: color-mix(in srgb, var(--ground) 94%, transparent); overflow: auto; z-index: 10; padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px); }
-.zoom img { display: block; max-width: none; height: min(86vh, 900px); width: auto; margin: 4vh 16px; cursor: zoom-out; }
-.zoom button { position: fixed; top: calc(env(safe-area-inset-top, 0px) + 12px); right: 16px; }
+.zoom { --bar: 0px; position: fixed; inset: 0; background: color-mix(in srgb, var(--ground) 94%, transparent); overflow: hidden; z-index: 10; display: flex; align-items: center; justify-content: center; padding: env(safe-area-inset-top, 0px) 0 calc(env(safe-area-inset-bottom, 0px) + var(--bar)); }
+.zoom[hidden] { display: none; }
+.zoom.sheet-mode { --bar: 96px; }
+.zoom img { display: block; width: auto; height: auto; max-width: calc(100vw - 32px); max-height: calc(100vh - 32px - var(--bar)); cursor: zoom-out; }
+.zoom img[hidden] { display: none; }
+#zoom-close { position: fixed; top: calc(env(safe-area-inset-top, 0px) + 12px); right: 16px; }
+.zoom-bar { position: fixed; left: 0; right: 0; bottom: 0; box-sizing: border-box; height: var(--bar); padding: 8px 16px calc(env(safe-area-inset-bottom, 0px) + 8px); display: grid; gap: 8px; align-content: center; background: var(--ground); border-top: 1px solid var(--rule); }
+.zoom-bar[hidden] { display: none; }
+.zoom-bar .label { font-size: 13px; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.zoom-bar .keys { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; max-width: 480px; width: 100%; margin-inline: auto; }
+.zoom-bar .btn { padding: 7px 4px; font-size: 13px; }
+.zoom-bar .btn:focus-visible { outline: 2px solid var(--c); outline-offset: 2px; }
 @media (prefers-reduced-motion: no-preference) { .q { animation: in .3s ease-out both; } @keyframes in { from { opacity: .4; } to { opacity: 1; } } }
 </style>
 
@@ -87,7 +105,19 @@ textarea { width: 100%; box-sizing: border-box; min-height: 64px; padding: 10px 
   <p class="note-off" id="db-off" hidden>このページでは答えを保存できません。チャットで答えてください。</p>
   <div id="list"></div>
 </div>
-<div class="zoom" id="zoom" hidden><button class="btn ghost" id="zoom-close">閉じる</button><img id="zoom-img" alt=""></div>
+<div class="zoom" id="zoom" hidden>
+  <button class="btn ghost" id="zoom-close">閉じる</button>
+  <img id="zoom-img" alt="">
+  <div class="zoom-bar" id="zoom-bar" hidden>
+    <div class="label" id="zoom-label"></div>
+    <div class="keys">
+      <button class="btn ghost" id="zoom-prev-row">前の案</button>
+      <button class="btn ghost" id="zoom-next-row">次の案</button>
+      <button class="btn ghost" id="zoom-prev-col" aria-label="前の列">←</button>
+      <button class="btn ghost" id="zoom-next-col" aria-label="次の列">→</button>
+    </div>
+  </div>
+</div>
 
 <script>
 // 問い（ここは Claude が書き足す）。答えは db の answers/<id> に入る
@@ -99,6 +129,7 @@ const QUESTIONS = [
   //   title: '絵文字をどこに置く？',        // 問いは1行
   //   context: '',                        // 要るときだけ短い1行
   //   images: [{ src: 'img/emoji-a.jpg', cap: '案1' }],
+  //   sheet: { cols: ['状態A', '状態B'], rows: [{ label: '現状', images: ['img/a1.jpg', 'img/a2.jpg'] }] },  // 案×状態の表（なくてよい）。空文字は空のマス
   //   options: [{ key: 'a', label: '案1 紙のふち', desc: '' }, { key: 'b', label: '案2 名前の横', desc: '' }],
   // },
 ]
@@ -140,6 +171,26 @@ function strips(images = []) {
   ))
 }
 
+// 案（行）× 状態（列）の表。サムネイルを押すと、行と列を移りながら拡大して見られる
+function sheetView(sheet) {
+  if (!sheet?.rows?.length) return null
+  const cols = sheet.cols ?? []
+  return el('div', { class: 'sheet', style: `--cols: ${cols.length}` },
+    el('div', { class: 'blank' }),
+    cols.map((c) => el('div', { class: 'h' }, c)),
+    // el() は子を 1 段しか平らにしないので、行ごとの [行名, マス…] をここで平らにする
+    sheet.rows.flatMap((row, r) => [
+      el('div', { class: 'rl' }, row.label),
+      ...cols.map((c, ci) => {
+        const src = row.images?.[ci]
+        if (!src) return el('div', { class: 'blank' })
+        return el('button', { class: 'cell', type: 'button', 'aria-label': `${row.label} · ${c}`, onclick: () => openSheetZoom(sheet, r, ci) },
+          el('img', { src, alt: '', loading: 'lazy' }))
+      }),
+    ]),
+  )
+}
+
 function fmt(at) {
   const d = new Date(at)
   if (isNaN(d)) return ''
@@ -154,6 +205,7 @@ function questionView(q) {
     eyebrow(q.tag, q.link, q.topic),
     el('h2', {}, q.title),
     q.context && el('p', { class: 'muted' }, q.context),
+    sheetView(q.sheet),
     strips(q.images),
   )
   if (!editing) {
@@ -191,6 +243,7 @@ function decidedView(d) {
     el('h2', {}, d.title),
     el('div', { class: 'decided' }, el('ul', {}, d.points.map((p) => el('li', {}, p)))),
     el('div', { class: 'muted' }, `${d.date.replaceAll('-', '.')} に決めた`),
+    sheetView(d.sheet),
     strips(d.images),
   )
 }
@@ -263,15 +316,77 @@ function render() {
   if (active) document.getElementById(active)?.focus()
 }
 
-function openZoom(im) {
-  const z = document.getElementById('zoom')
-  const img = document.getElementById('zoom-img')
-  img.src = im.src
-  img.alt = im.cap
-  z.hidden = false
+const zoomEl = document.getElementById('zoom')
+const zoomImg = document.getElementById('zoom-img')
+const zoomBar = document.getElementById('zoom-bar')
+let zs = null // シートの拡大中だけ { sheet, r, c }
+
+function closeZoom() {
+  zoomEl.hidden = true
+  zs = null
 }
-document.getElementById('zoom').addEventListener('click', () => { document.getElementById('zoom').hidden = true })
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape') document.getElementById('zoom').hidden = true })
+
+// シートでない画像の拡大。ビューポートに収める
+function openZoom(im) {
+  zs = null
+  zoomEl.classList.remove('sheet-mode')
+  zoomBar.hidden = true
+  zoomImg.hidden = false
+  zoomImg.src = im.src
+  zoomImg.alt = im.cap
+  zoomEl.hidden = false
+}
+
+function showSheetCell() {
+  const { sheet, r, c } = zs
+  const row = sheet.rows[r]
+  const src = row.images?.[c]
+  const text = `${row.label} · ${sheet.cols[c]}`
+  zoomImg.hidden = !src
+  if (src) zoomImg.src = src
+  else zoomImg.removeAttribute('src')
+  zoomImg.alt = text
+  document.getElementById('zoom-label').textContent = text
+  document.getElementById('zoom-prev-row').disabled = r <= 0
+  document.getElementById('zoom-next-row').disabled = r >= sheet.rows.length - 1
+  document.getElementById('zoom-prev-col').disabled = c <= 0
+  document.getElementById('zoom-next-col').disabled = c >= sheet.cols.length - 1
+}
+
+function openSheetZoom(sheet, r, c) {
+  zs = { sheet, r, c }
+  zoomEl.classList.add('sheet-mode')
+  zoomBar.hidden = false
+  zoomEl.hidden = false
+  showSheetCell()
+}
+
+// 行・列を動かす。端では動かない
+function moveSheet(dr, dc) {
+  if (!zs) return
+  const r = zs.r + dr
+  const c = zs.c + dc
+  if (r < 0 || r >= zs.sheet.rows.length || c < 0 || c >= zs.sheet.cols.length) return
+  zs.r = r
+  zs.c = c
+  showSheetCell()
+}
+
+zoomEl.addEventListener('click', closeZoom)
+zoomBar.addEventListener('click', (e) => e.stopPropagation())
+for (const [id, dr, dc] of [['zoom-prev-row', -1, 0], ['zoom-next-row', 1, 0], ['zoom-prev-col', 0, -1], ['zoom-next-col', 0, 1]]) {
+  document.getElementById(id).addEventListener('click', () => moveSheet(dr, dc))
+}
+document.addEventListener('keydown', (e) => {
+  if (zoomEl.hidden) return
+  if (e.key === 'Escape') closeZoom()
+  else if (zs && e.key.startsWith('Arrow')) {
+    const move = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] }[e.key]
+    if (!move) return
+    e.preventDefault()
+    moveSheet(...move)
+  }
+})
 for (const b of document.querySelectorAll('.tabs button')) b.addEventListener('click', () => { tab = b.dataset.tab; render() })
 
 render()
