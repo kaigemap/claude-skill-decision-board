@@ -8,13 +8,14 @@
   --sub: #77736b;
   --rule: #e3ded4;
   --c: #4e6178;
+  --ok: #2f7a4c; /* 「コピーしました」の一瞬だけ */
   --font-jp: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', system-ui, sans-serif;
   --font-latin: 'Avenir Next', 'Helvetica Neue', 'Hiragino Sans', sans-serif;
 }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) { --ground: #18191c; --paper: #202226; --ink: #e8e5df; --sub: #9a968e; --rule: #2f3136; --c: #9fb3cc; color-scheme: dark; }
+  :root:not([data-theme="light"]) { --ground: #18191c; --paper: #202226; --ink: #e8e5df; --sub: #9a968e; --rule: #2f3136; --c: #9fb3cc; --ok: #7cc49a; color-scheme: dark; }
 }
-:root[data-theme="dark"] { --ground: #18191c; --paper: #202226; --ink: #e8e5df; --sub: #9a968e; --rule: #2f3136; --c: #9fb3cc; color-scheme: dark; }
+:root[data-theme="dark"] { --ground: #18191c; --paper: #202226; --ink: #e8e5df; --sub: #9a968e; --rule: #2f3136; --c: #9fb3cc; --ok: #7cc49a; color-scheme: dark; }
 
 body { background: var(--ground); color: var(--ink); font-family: var(--font-jp); font-size: 15px; line-height: 1.7; }
 .wrap { max-width: 760px; margin: 0 auto; padding-inline: 20px; padding-block: 28px 80px; }
@@ -47,11 +48,13 @@ h1 { font-size: 22px; font-weight: 600; margin: 18px 0 4px; text-wrap: balance; 
 .opt b { font-weight: 600; }
 .opt span { color: var(--sub); font-size: 13px; grid-column: 2; }
 .opt:has(input:checked) { border-color: var(--c); }
-textarea { width: 100%; box-sizing: border-box; min-height: 64px; padding: 10px 12px; font: inherit; font-size: 14px; color: var(--ink); background: var(--paper); border: 1px solid var(--rule); resize: vertical; }
+/* 16px より小さい入力欄は iPhone が拡大したまま戻さず、ページが横にはみ出して見える */
+textarea { width: 100%; box-sizing: border-box; min-height: 64px; padding: 10px 12px; font: inherit; font-size: 16px; color: var(--ink); background: var(--paper); border: 1px solid var(--rule); resize: vertical; }
 .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
-.btn { appearance: none; font: inherit; font-size: 14px; font-weight: 600; padding: 9px 20px; border: 1px solid var(--ink); background: var(--ink); color: var(--ground); cursor: pointer; }
+.btn { appearance: none; font: inherit; font-size: 14px; font-weight: 600; padding: 9px 20px; border: 1px solid var(--ink); background: var(--ink); color: var(--ground); cursor: pointer; transition: background-color .3s ease, border-color .3s ease; }
 .btn.ghost { background: none; color: var(--ink); border-color: var(--rule); font-weight: 400; }
 .btn:disabled { opacity: .4; cursor: default; }
+.btn.done { background: var(--ok); border-color: var(--ok); transition: none; } /* すぐ変わり、ゆっくり戻る */
 .answer { border-left: 2px solid var(--c); padding: 2px 0 2px 12px; }
 .answer .when { font-family: var(--font-latin); font-variant-numeric: tabular-nums; color: var(--sub); font-size: 12px; margin-left: 8px; }
 .decided { border-left: 2px solid var(--rule); padding: 2px 0 2px 12px; }
@@ -59,7 +62,7 @@ textarea { width: 100%; box-sizing: border-box; min-height: 64px; padding: 10px 
 .decided ul { margin: 0; padding-left: 1.2em; }
 .copybar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; padding-block: 16px; border-bottom: 1px solid var(--rule); }
 .copybar .muted { flex: 1 1 200px; min-width: 0; }
-#copy-text { width: 100%; min-height: 120px; font-size: 13px; }
+#copy-text { width: 100%; min-height: 120px; font-size: 16px; }
 .empty { padding-block: 40px; color: var(--sub); text-align: center; font-size: 14px; }
 .note-off { color: var(--sub); font-size: 12px; }
 
@@ -235,7 +238,12 @@ document.getElementById('copy-btn').addEventListener('click', async () => {
     await navigator.clipboard.writeText(text)
     box.hidden = true
     btn.textContent = 'コピーしました'
-    setTimeout(() => (btn.textContent = '答えをコピー'), 2000)
+    btn.classList.add('done')
+    clearTimeout(btn.doneTimer)
+    btn.doneTimer = setTimeout(() => {
+      btn.textContent = '答えをコピー'
+      btn.classList.remove('done')
+    }, 1500)
   } catch {
     // コピーできない画面では、選んだ状態の文を出す
     box.value = text
