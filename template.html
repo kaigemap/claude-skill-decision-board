@@ -214,28 +214,46 @@ async function save(q, status) {
   }
 }
 
-// チャットに貼る文。まだ「決まった」に移していない問いの答えだけ
-function answerText() {
-  const lines = QUESTIONS.filter((q) => answers[q.id]).map((q) => {
+// チャットに貼る文。まだ「決まった」に移していない問いの答えのうち、まだコピーしていないものだけ。
+// 新しい答えがないときは、答えた問いを全部（2回押せば全部ほしいときに足りる）。
+// コピーした答えは、この端末に覚えておく（答えた時刻で見分けるので、答えを変えるとまた新しい答えになる）
+const COPIED_KEY = 'kimegoto:copied'
+const copied = (() => { try { return JSON.parse(localStorage.getItem(COPIED_KEY)) || {} } catch { return {} } })()
+const answeredQs = () => QUESTIONS.filter((q) => answers[q.id])
+const freshQs = () => answeredQs().filter((q) => copied[q.id] !== answers[q.id].at)
+const toCopy = () => (freshQs().length ? freshQs() : answeredQs())
+
+function answerText(qs) {
+  const lines = qs.map((q) => {
     const a = answers[q.id]
     const opt = optionsOf(q).find((o) => o.key === a.choice)
     return `- ${q.tag ? q.tag + ' ' : ''}${q.title} → ${opt ? opt.label : a.choice}${a.note ? `（${a.note}）` : ''}`
   })
   return lines.length ? ['決めごとページの答え', ...lines].join('\n') : ''
 }
+function markCopied(qs) {
+  for (const q of qs) copied[q.id] = answers[q.id].at
+  try { localStorage.setItem(COPIED_KEY, JSON.stringify(copied)) } catch {}
+}
 
 function renderCopy() {
-  const n = QUESTIONS.filter((q) => answers[q.id]).length
-  document.getElementById('copybar').hidden = n === 0
-  document.getElementById('copy-label').textContent = `答えた ${n} 問を、チャットに貼れる形でコピーします`
+  const all = answeredQs().length
+  const fresh = freshQs().length
+  document.getElementById('copybar').hidden = all === 0
+  document.getElementById('copy-label').textContent = fresh
+    ? `まだコピーしていない ${fresh} 問の答えを、チャットに貼れる形でコピーします`
+    : `答えた ${all} 問はコピー済みです。もう一度押すと全部をコピーします`
 }
 
 document.getElementById('copy-btn').addEventListener('click', async () => {
-  const text = answerText()
+  const qs = toCopy()
+  const text = answerText(qs)
   const btn = document.getElementById('copy-btn')
   const box = document.getElementById('copy-text')
   try {
     await navigator.clipboard.writeText(text)
+    markCopied(qs)
+    renderCopy()
     box.hidden = true
     btn.textContent = 'コピーしました'
     btn.classList.add('done')
@@ -247,6 +265,8 @@ document.getElementById('copy-btn').addEventListener('click', async () => {
   } catch {
     // コピーできない画面では、選んだ状態の文を出す
     box.value = text
+    markCopied(qs)
+    renderCopy()
     box.hidden = false
     box.focus()
     box.select()
