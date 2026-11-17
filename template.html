@@ -17,6 +17,7 @@
 }
 :root[data-theme="dark"] { --ground: #18191c; --paper: #202226; --ink: #e8e5df; --sub: #9a968e; --rule: #2f3136; --c: #9fb3cc; --ok: #7cc49a; color-scheme: dark; }
 
+[hidden] { display: none !important; } /* display を決めた要素（.copybar など）でも隠れるように */
 body { background: var(--ground); color: var(--ink); font-family: var(--font-jp); font-size: 15px; line-height: 1.7; }
 .wrap { max-width: 760px; margin: 0 auto; padding-inline: 20px; padding-block: 28px 80px; }
 .logo { font-family: var(--font-latin); font-weight: 600; font-size: 12px; letter-spacing: .32em; color: var(--sub); text-align: center; }
@@ -66,6 +67,17 @@ textarea { width: 100%; box-sizing: border-box; min-height: 64px; padding: 10px 
 .empty { padding-block: 40px; color: var(--sub); text-align: center; font-size: 14px; }
 .note-off { color: var(--sub); font-size: 12px; }
 
+/* メモ: 書いて送る欄と、送ったメモ */
+.memo-new { display: grid; gap: 10px; padding-block: 24px; border-bottom: 1px solid var(--rule); }
+.memo-new textarea { min-height: 96px; }
+.thumbs { display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-end; }
+.thumb { display: grid; gap: 4px; justify-items: start; }
+.thumbs img { display: block; height: 96px; width: auto; max-width: 100%; border: 1px solid var(--rule); background: var(--paper); cursor: zoom-in; }
+.thumb .btn { padding: 4px 10px; font-size: 12px; }
+.memo { padding-block: 22px; border-bottom: 1px solid var(--rule); display: grid; gap: 10px; }
+.memo .meta { display: flex; gap: 10px; font-family: var(--font-latin); font-variant-numeric: tabular-nums; color: var(--sub); font-size: 12px; }
+.memo .got { color: var(--c); font-family: var(--font-jp); }
+.memo .text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .zoom { position: fixed; inset: 0; background: color-mix(in srgb, var(--ground) 94%, transparent); overflow: auto; z-index: 10; padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px); }
 .zoom img { display: block; max-width: none; height: min(86vh, 900px); width: auto; margin: 4vh 16px; cursor: zoom-out; }
 .zoom button { position: fixed; top: calc(env(safe-area-inset-top, 0px) + 12px); right: 16px; }
@@ -75,12 +87,13 @@ textarea { width: 100%; box-sizing: border-box; min-height: 64px; padding: 10px 
 <div class="wrap">
   <div class="logo">{{PROJECT}}</div>
   <h1>決めごと</h1>
-  <p class="lead">作業の途中で聞きたいことと見本をここに置きます。答えたら「答えをコピー」を押して、チャットに貼ってください。</p>
+  <p class="lead">作業の途中で聞きたいことと見本をここに置きます。答えたら「答えをコピー」を押して、チャットに貼ってください。やりたいことは「メモ」に書いておけば、次に作業するときに読みます。</p>
 
   <div class="tabs" role="tablist" aria-label="絞り込み">
     <button role="tab" id="tab-open" aria-selected="true" data-tab="open">まだ<span class="n" id="n-open"></span></button>
     <button role="tab" id="tab-answered" aria-selected="false" data-tab="answered">答えた<span class="n" id="n-answered"></span></button>
     <button role="tab" id="tab-decided" aria-selected="false" data-tab="decided">決まった<span class="n" id="n-decided"></span></button>
+    <button role="tab" id="tab-memos" aria-selected="false" data-tab="memos">メモ<span class="n" id="n-memos"></span></button>
   </div>
   <div class="copybar" id="copybar" hidden>
     <span class="muted" id="copy-label"></span>
@@ -119,6 +132,17 @@ let tab = 'open'
 let db = null
 let dbReady = false
 const drafts = {}
+
+// メモ（やりたいこと・気づいたこと）。db の memos/<id> に { text, images: [asset id], at }。
+// Claude が次の作業の始めに読み、受け取ったら done: true と reply（何にしたか）を書き足す
+const memos = []
+let assets = null // スクショを置ける人（ページを編集できる人）だけ。null なら文だけ
+const memoDraft = { text: '', files: [] } // files: [{ file, url }]
+let sending = false
+let memoNote = '' // 送った・送れなかった、の知らせ（描き直しても残す）
+const ASSET_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp']
+const MAX_SIDE = 2400 // ほかの形式の画像は、長い辺をこれまでにした JPEG にして送る
+const blobUrl = (id) => '/_blob/' + id
 
 const el = (tag, attrs = {}, ...kids) => {
   const e = document.createElement(tag)
@@ -198,6 +222,107 @@ function decidedView(d) {
   )
 }
 
+const canSend = () => dbReady && !sending && Boolean(memoDraft.text.trim() || memoDraft.files.length)
+const memoStatus = (text) => {
+  memoNote = text
+  const s = document.getElementById('memo-status')
+  if (s) s.textContent = text
+}
+
+function memoComposer() {
+  const ta = el('textarea', { id: 'memo-text', placeholder: 'やりたいこと・気づいたこと', 'aria-label': 'メモ' })
+  ta.value = memoDraft.text
+  const send = el('button', { class: 'btn', id: 'memo-send', disabled: !canSend(), onclick: sendMemo }, sending ? '送っています…' : '送る')
+  ta.addEventListener('input', () => { memoDraft.text = ta.value; send.disabled = !canSend(); if (memoNote && !sending) memoStatus('') })
+  const pick = el('input', { type: 'file', accept: 'image/*', multiple: true, hidden: true })
+  pick.addEventListener('change', () => {
+    for (const file of pick.files) memoDraft.files.push({ file, url: URL.createObjectURL(file) })
+    pick.value = ''
+    render()
+  })
+  return el('section', { class: 'memo-new' },
+    ta,
+    memoDraft.files.length > 0 && el('div', { class: 'thumbs' }, memoDraft.files.map((f, i) => el('div', { class: 'thumb' },
+      el('img', { src: f.url, alt: `スクショ ${i + 1}`, onclick: () => openZoom({ src: f.url, cap: `スクショ ${i + 1}` }) }),
+      el('button', { class: 'btn ghost', disabled: sending, onclick: () => { URL.revokeObjectURL(f.url); memoDraft.files.splice(i, 1); render() } }, '外す'),
+    ))),
+    el('div', { class: 'row' },
+      send,
+      assets && el('button', { class: 'btn ghost', id: 'memo-pick', disabled: sending, onclick: () => pick.click() }, 'スクショを足す'),
+      pick,
+      el('span', { class: 'muted', id: 'memo-status' }, memoNote),
+    ),
+  )
+}
+
+function memoView(m) {
+  const images = Array.isArray(m.images) ? m.images.filter((id) => typeof id === 'string') : []
+  return el('section', { class: 'memo', id: m.id },
+    el('div', { class: 'meta' }, fmt(m.at), m.done && el('span', { class: 'got' }, '受け取った')),
+    m.text && el('p', { class: 'text' }, String(m.text)),
+    images.length > 0 && el('div', { class: 'thumbs' }, images.map((id, i) =>
+      el('img', { src: blobUrl(id), alt: `スクショ ${i + 1}`, loading: 'lazy', onclick: () => openZoom({ src: blobUrl(id), cap: `スクショ ${i + 1}` }) }))),
+    m.reply && el('div', { class: 'answer' }, el('div', { class: 'muted' }, String(m.reply))),
+    el('div', { class: 'row' }, el('button', { class: 'btn ghost', id: `${m.id}-remove`, disabled: !dbReady, onclick: (e) => removeMemo(m, images, e.currentTarget) }, '消す')),
+  )
+}
+
+/** 送れる形の画像: そのままか、長い辺を MAX_SIDE までにした JPEG（HEIC などのとき） */
+async function uploadable(file) {
+  if (ASSET_TYPES.includes(file.type) && file.size <= 20 * 1024 * 1024) return file
+  const bitmap = await createImageBitmap(file)
+  const k = Math.min(1, MAX_SIDE / Math.max(bitmap.width, bitmap.height))
+  const canvas = document.createElement('canvas')
+  canvas.width = Math.round(bitmap.width * k)
+  canvas.height = Math.round(bitmap.height * k)
+  canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+  bitmap.close()
+  return new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('toBlob'))), 'image/jpeg', 0.9))
+}
+
+async function sendMemo() {
+  if (!canSend()) return
+  sending = true
+  render()
+  const ids = []
+  try {
+    for (const [i, f] of memoDraft.files.entries()) {
+      memoStatus(`スクショを送っています（${i + 1}/${memoDraft.files.length}）`)
+      ids.push((await assets.upload(await uploadable(f.file))).id)
+    }
+    await db.collection('memos').doc('m' + Date.now().toString(36)).set({ text: memoDraft.text.trim(), images: ids, at: new Date().toISOString() })
+    for (const f of memoDraft.files) URL.revokeObjectURL(f.url)
+    memoDraft.text = ''
+    memoDraft.files = []
+    sending = false
+    render()
+    memoStatus('送りました')
+  } catch (e) {
+    for (const id of ids) assets.delete(id).catch(() => {}) // メモにならなかったスクショは残さない
+    sending = false
+    render()
+    memoStatus(e?.code === 'too_large' ? '大きすぎるスクショがあります（20 MB まで）'
+      : e?.code === 'quota_or_state' ? 'このページに置ける量を超えました'
+      : '送れませんでした。もう一度押してください')
+  }
+}
+
+async function removeMemo(m, images, btn) {
+  if (!btn.dataset.armed) { // 1 回目はたしかめるだけ
+    btn.dataset.armed = '1'
+    btn.textContent = '本当に消す'
+    return
+  }
+  btn.disabled = true
+  try {
+    if (assets) for (const id of images) await assets.delete(id).catch(() => {})
+    await db.collection('memos').doc(m.id).delete()
+  } catch {
+    btn.disabled = false
+    btn.textContent = '消せませんでした。もう一度押す'
+  }
+}
+
 async function save(q, status) {
   const draft = drafts[q.id]
   if (draft.choice === OTHER.key && !draft.note.trim()) {
@@ -239,7 +364,7 @@ function markCopied(qs) {
 function renderCopy() {
   const all = answeredQs().length
   const fresh = freshQs().length
-  document.getElementById('copybar').hidden = all === 0
+  document.getElementById('copybar').hidden = all === 0 || tab === 'memos'
   document.getElementById('copy-label').textContent = fresh
     ? `まだコピーしていない ${fresh} 問の答えを、チャットに貼れる形でコピーします`
     : `答えた ${all} 問はコピー済みです。もう一度押すと全部をコピーします`
@@ -281,10 +406,20 @@ function render() {
   document.getElementById('n-open').textContent = open.length
   document.getElementById('n-answered').textContent = answered.length
   document.getElementById('n-decided').textContent = DECIDED.length
+  document.getElementById('n-memos').textContent = memos.filter((m) => !m.done).length || ''
   for (const b of document.querySelectorAll('.tabs button')) b.setAttribute('aria-selected', String(b.dataset.tab === tab))
   const list = document.getElementById('list')
   const active = document.activeElement?.id
   list.replaceChildren()
+  if (tab === 'memos') {
+    const sorted = [...memos].sort((a, b) => String(b.at).localeCompare(String(a.at)))
+    list.append(memoComposer(), ...sorted.map(memoView))
+    if (!sorted.length) list.append(el('p', { class: 'empty' }, 'まだメモはありません'))
+    const back = active ? document.getElementById(active) : null
+    back?.focus()
+    if (back?.id === 'memo-text') back.setSelectionRange(back.value.length, back.value.length) // 書いている途中に描き直しても続きから
+    return
+  }
   const items = tab === 'open' ? open.map(questionView) : tab === 'answered' ? answered.map(questionView) : DECIDED.map(decidedView)
   if (!items.length) list.append(el('p', { class: 'empty' }, tab === 'open' ? 'いま聞きたいことはありません' : tab === 'answered' ? 'まだ答えはありません' : 'まだありません'))
   list.append(...items)
@@ -311,7 +446,13 @@ render()
     return
   }
   dbReady = true
+  assets = await window.claude.use('assets').catch(() => null)
   render()
+  db.collection('memos').onSnapshot((snap) => {
+    memos.length = 0
+    for (const d of snap.docs) if (d.exists) memos.push({ ...d.data(), id: d.id })
+    render()
+  }, () => {})
   db.collection('answers').onSnapshot((snap) => {
     for (const k of Object.keys(answers)) delete answers[k]
     for (const d of snap.docs) if (d.exists) answers[d.id] = d.data()
