@@ -87,20 +87,19 @@ textarea { width: 100%; box-sizing: border-box; min-height: 64px; padding: 10px 
 <div class="wrap">
   <div class="logo">{{PROJECT}}</div>
   <h1>決めごと</h1>
-  <p class="lead">作業の途中で聞きたいことと見本をここに置きます。答えたら「答えをコピー」を押して、チャットに貼ってください。やりたいことは「メモ」に書いておけば、次に作業するときに読みます。</p>
 
   <div class="tabs" role="tablist" aria-label="絞り込み">
-    <button role="tab" id="tab-open" aria-selected="true" data-tab="open">まだ<span class="n" id="n-open"></span></button>
-    <button role="tab" id="tab-answered" aria-selected="false" data-tab="answered">答えた<span class="n" id="n-answered"></span></button>
-    <button role="tab" id="tab-decided" aria-selected="false" data-tab="decided">決まった<span class="n" id="n-decided"></span></button>
+    <button role="tab" id="tab-open" aria-selected="true" data-tab="open">未回答<span class="n" id="n-open"></span></button>
+    <button role="tab" id="tab-answered" aria-selected="false" data-tab="answered">回答済み<span class="n" id="n-answered"></span></button>
+    <button role="tab" id="tab-decided" aria-selected="false" data-tab="decided">決定済み<span class="n" id="n-decided"></span></button>
     <button role="tab" id="tab-memos" aria-selected="false" data-tab="memos">メモ<span class="n" id="n-memos"></span></button>
   </div>
   <div class="copybar" id="copybar" hidden>
     <span class="muted" id="copy-label"></span>
-    <button class="btn" id="copy-btn">答えをコピー</button>
-    <textarea id="copy-text" hidden readonly aria-label="チャットに貼る答え"></textarea>
+    <button class="btn" id="copy-btn">回答をコピー</button>
+    <textarea id="copy-text" hidden readonly aria-label="チャットに貼り付ける回答"></textarea>
   </div>
-  <p class="note-off" id="db-off" hidden>このページでは答えを保存できません。チャットで答えてください。</p>
+  <p class="note-off" id="db-off" hidden>このページでは回答を保存できません。チャットで回答してください。</p>
   <div id="list"></div>
 </div>
 <div class="zoom" id="zoom" hidden><button class="btn ghost" id="zoom-close">閉じる</button><img id="zoom-img" alt=""></div>
@@ -125,7 +124,7 @@ const DECIDED = [
 ]
 
 // どの選択肢にも当てはまらないときの答え。どの問いにも最後に足す（問いの側で key: 'other' を書いていればそれを使う）
-const OTHER = { key: 'other', label: 'どれでもない', desc: 'ひとことに書く' }
+const OTHER = { key: 'other', label: 'どれでもない', desc: 'コメントに入力' }
 const optionsOf = (q) => (q.options.some((o) => o.key === OTHER.key) ? q.options : [...q.options, OTHER])
 const answers = {}
 let tab = 'open'
@@ -189,7 +188,7 @@ function questionView(q) {
       el('div', {}, el('b', {}, opt ? opt.label : a.choice), el('span', { class: 'when' }, fmt(a.at))),
       a.note && el('div', { class: 'muted' }, a.note),
     ))
-    box.append(el('div', { class: 'row' }, el('button', { class: 'btn ghost', disabled: !dbReady, onclick: () => { draft.editing = true; render() } }, '答えを変える')))
+    box.append(el('div', { class: 'row' }, el('button', { class: 'btn ghost', disabled: !dbReady, onclick: () => { draft.editing = true; render() } }, '回答を変更')))
     return box
   }
   box.append(el('div', { class: 'opts', role: 'radiogroup', 'aria-label': q.title },
@@ -199,13 +198,13 @@ function questionView(q) {
       o.desc && el('span', {}, o.desc),
     )),
   ))
-  const ta = el('textarea', { id: `${q.id}-note`, placeholder: draft.choice === OTHER.key ? 'どうしたいかを書く' : 'ひとこと（任意）', 'aria-label': 'ひとこと' })
+  const ta = el('textarea', { id: `${q.id}-note`, placeholder: draft.choice === OTHER.key ? 'どうしたいかを入力' : 'コメント（任意）', 'aria-label': 'コメント' })
   ta.value = draft.note
   ta.addEventListener('input', () => { draft.note = ta.value })
   box.append(ta)
   const status = el('span', { class: 'muted', id: `${q.id}-status` })
   box.append(el('div', { class: 'row' },
-    el('button', { class: 'btn', disabled: !dbReady || !draft.choice, onclick: () => save(q, status) }, '答える'),
+    el('button', { class: 'btn', disabled: !dbReady || !draft.choice, onclick: () => save(q, status) }, '回答'),
     a && el('button', { class: 'btn ghost', onclick: () => { draft.editing = false; draft.choice = a.choice; draft.note = a.note ?? ''; render() } }, 'やめる'),
     status,
   ))
@@ -217,7 +216,7 @@ function decidedView(d) {
     eyebrow(d.tag, d.link, d.topic),
     el('h2', {}, d.title),
     el('div', { class: 'decided' }, el('ul', {}, d.points.map((p) => el('li', {}, p)))),
-    el('div', { class: 'muted' }, `${d.date.replaceAll('-', '.')} に決めた`),
+    el('div', { class: 'muted' }, `${d.date.replaceAll('-', '.')} 決定`),
     strips(d.images),
   )
 }
@@ -232,7 +231,7 @@ const memoStatus = (text) => {
 function memoComposer() {
   const ta = el('textarea', { id: 'memo-text', placeholder: 'やりたいこと・気づいたこと', 'aria-label': 'メモ' })
   ta.value = memoDraft.text
-  const send = el('button', { class: 'btn', id: 'memo-send', disabled: !canSend(), onclick: sendMemo }, sending ? '送っています…' : '送る')
+  const send = el('button', { class: 'btn', id: 'memo-send', disabled: !canSend(), onclick: sendMemo }, sending ? '送信中…' : '送信')
   ta.addEventListener('input', () => { memoDraft.text = ta.value; send.disabled = !canSend(); if (memoNote && !sending) memoStatus('') })
   const pick = el('input', { type: 'file', accept: 'image/*', multiple: true, hidden: true })
   pick.addEventListener('change', () => {
@@ -243,12 +242,12 @@ function memoComposer() {
   return el('section', { class: 'memo-new' },
     ta,
     memoDraft.files.length > 0 && el('div', { class: 'thumbs' }, memoDraft.files.map((f, i) => el('div', { class: 'thumb' },
-      el('img', { src: f.url, alt: `スクショ ${i + 1}`, onclick: () => openZoom({ src: f.url, cap: `スクショ ${i + 1}` }) }),
-      el('button', { class: 'btn ghost', disabled: sending, onclick: () => { URL.revokeObjectURL(f.url); memoDraft.files.splice(i, 1); render() } }, '外す'),
+      el('img', { src: f.url, alt: `スクリーンショット ${i + 1}`, onclick: () => openZoom({ src: f.url, cap: `スクリーンショット ${i + 1}` }) }),
+      el('button', { class: 'btn ghost', disabled: sending, onclick: () => { URL.revokeObjectURL(f.url); memoDraft.files.splice(i, 1); render() } }, '削除'),
     ))),
     el('div', { class: 'row' },
       send,
-      assets && el('button', { class: 'btn ghost', id: 'memo-pick', disabled: sending, onclick: () => pick.click() }, 'スクショを足す'),
+      assets && el('button', { class: 'btn ghost', id: 'memo-pick', disabled: sending, onclick: () => pick.click() }, 'スクリーンショットを追加'),
       pick,
       el('span', { class: 'muted', id: 'memo-status' }, memoNote),
     ),
@@ -258,12 +257,12 @@ function memoComposer() {
 function memoView(m) {
   const images = Array.isArray(m.images) ? m.images.filter((id) => typeof id === 'string') : []
   return el('section', { class: 'memo', id: m.id },
-    el('div', { class: 'meta' }, fmt(m.at), m.done && el('span', { class: 'got' }, '受け取った')),
+    el('div', { class: 'meta' }, fmt(m.at), m.done && el('span', { class: 'got' }, '確認済み')),
     m.text && el('p', { class: 'text' }, String(m.text)),
     images.length > 0 && el('div', { class: 'thumbs' }, images.map((id, i) =>
-      el('img', { src: blobUrl(id), alt: `スクショ ${i + 1}`, loading: 'lazy', onclick: () => openZoom({ src: blobUrl(id), cap: `スクショ ${i + 1}` }) }))),
+      el('img', { src: blobUrl(id), alt: `スクリーンショット ${i + 1}`, loading: 'lazy', onclick: () => openZoom({ src: blobUrl(id), cap: `スクリーンショット ${i + 1}` }) }))),
     m.reply && el('div', { class: 'answer' }, el('div', { class: 'muted' }, String(m.reply))),
-    el('div', { class: 'row' }, el('button', { class: 'btn ghost', id: `${m.id}-remove`, disabled: !dbReady, onclick: (e) => removeMemo(m, images, e.currentTarget) }, '消す')),
+    el('div', { class: 'row' }, el('button', { class: 'btn ghost', id: `${m.id}-remove`, disabled: !dbReady, onclick: (e) => removeMemo(m, images, e.currentTarget) }, '削除')),
   )
 }
 
@@ -287,7 +286,7 @@ async function sendMemo() {
   const ids = []
   try {
     for (const [i, f] of memoDraft.files.entries()) {
-      memoStatus(`スクショを送っています（${i + 1}/${memoDraft.files.length}）`)
+      memoStatus(`スクリーンショットを送信中（${i + 1}/${memoDraft.files.length}）`)
       ids.push((await assets.upload(await uploadable(f.file))).id)
     }
     await db.collection('memos').doc('m' + Date.now().toString(36)).set({ text: memoDraft.text.trim(), images: ids, at: new Date().toISOString() })
@@ -296,21 +295,21 @@ async function sendMemo() {
     memoDraft.files = []
     sending = false
     render()
-    memoStatus('送りました')
+    memoStatus('送信しました')
   } catch (e) {
     for (const id of ids) assets.delete(id).catch(() => {}) // メモにならなかったスクショは残さない
     sending = false
     render()
-    memoStatus(e?.code === 'too_large' ? '大きすぎるスクショがあります（20 MB まで）'
+    memoStatus(e?.code === 'too_large' ? 'サイズが大きすぎるスクリーンショットがあります（20 MB まで）'
       : e?.code === 'quota_or_state' ? 'このページに置ける量を超えました'
-      : '送れませんでした。もう一度押してください')
+      : '送信できませんでした。もう一度お試しください')
   }
 }
 
 async function removeMemo(m, images, btn) {
   if (!btn.dataset.armed) { // 1 回目はたしかめるだけ
     btn.dataset.armed = '1'
-    btn.textContent = '本当に消す'
+    btn.textContent = '削除を確定'
     return
   }
   btn.disabled = true
@@ -319,14 +318,14 @@ async function removeMemo(m, images, btn) {
     await db.collection('memos').doc(m.id).delete()
   } catch {
     btn.disabled = false
-    btn.textContent = '消せませんでした。もう一度押す'
+    btn.textContent = '削除できませんでした。もう一度お試しください'
   }
 }
 
 async function save(q, status) {
   const draft = drafts[q.id]
   if (draft.choice === OTHER.key && !draft.note.trim()) {
-    status.textContent = 'どうしたいかを、ひとことに書いてください'
+    status.textContent = 'どうしたいかをコメントに入力してください'
     return
   }
   status.textContent = '保存中…'
@@ -366,8 +365,8 @@ function renderCopy() {
   const fresh = freshQs().length
   document.getElementById('copybar').hidden = all === 0 || tab === 'memos'
   document.getElementById('copy-label').textContent = fresh
-    ? `まだコピーしていない ${fresh} 問の答えを、チャットに貼れる形でコピーします`
-    : `答えた ${all} 問はコピー済みです。もう一度押すと全部をコピーします`
+    ? `未コピーの回答 ${fresh} 件を、チャットに貼り付けられる形式でコピーします`
+    : `回答 ${all} 件はすべてコピー済みです。もう一度押すと全件をコピーします`
 }
 
 document.getElementById('copy-btn').addEventListener('click', async () => {
@@ -384,7 +383,7 @@ document.getElementById('copy-btn').addEventListener('click', async () => {
     btn.classList.add('done')
     clearTimeout(btn.doneTimer)
     btn.doneTimer = setTimeout(() => {
-      btn.textContent = '答えをコピー'
+      btn.textContent = '回答をコピー'
       btn.classList.remove('done')
     }, 1500)
   } catch {
@@ -421,7 +420,7 @@ function render() {
     return
   }
   const items = tab === 'open' ? open.map(questionView) : tab === 'answered' ? answered.map(questionView) : DECIDED.map(decidedView)
-  if (!items.length) list.append(el('p', { class: 'empty' }, tab === 'open' ? 'いま聞きたいことはありません' : tab === 'answered' ? 'まだ答えはありません' : 'まだありません'))
+  if (!items.length) list.append(el('p', { class: 'empty' }, tab === 'open' ? '未回答の質問はありません' : tab === 'answered' ? 'まだ回答はありません' : 'まだありません'))
   list.append(...items)
   if (active) document.getElementById(active)?.focus()
 }
